@@ -1,15 +1,15 @@
 <package>
-  <description brief="acuity">
+  <description brief="acuity_ar1000">
 
-     acuity
+     Acuity ar1000 laser range sensor driver.
 
   </description>
   <author>Shaun Edwards</author>
-  <license>Proprietary</license>
+  <license>Apache 2.0</license>
   <review status="unreviewed" notes=""/>
   <url>http://ros.org/wiki/acuity_ar1000</url>
   <depend package="rospy"/>
-  <depend package="std_msgs"/>
+  <depend package="sensor_msgs"/>
 
 </package>
 

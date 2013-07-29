@@ -1,32 +1,70 @@
 #!/usr/bin/python
-
-import roslib; roslib.load_manifest('Acuity')
+# Copyright 20XX Southwest Research Institute
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+   
+   
+import roslib; roslib.load_manifest('acuity_ar1000')
 import rospy
 import serial
-from Acuity.msg import LaserRange
+from sensor_msgs.msg import Range
 
 
 def acuity_serial():
     rospy.loginfo("Creating publisher")
-    pub = rospy.Publisher('laser_dist', LaserRange)
+    pub = rospy.Publisher('laser_dist', Range)
     rospy.loginfo("Creating serial connection")
-    s = serial.Serial(port='/dev/ttyS0', baudrate=9600, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, timeout=1)
+    # Serial parameters
+    p = rospy.get_param('port', '/dev/ttyUSB0')
+    br = rospy.get_param('baud', 9600)
+    bs = rospy.get_param('byte_size', serial.EIGHTBITS)
+    prty = rospy.get_param('parity', serial.PARITY_NONE)
+    sb = rospy.get_param('stop_bits', serial.STOPBITS_ONE)
+    to = rospy.get_param('timeout', 1)
+    
+    # Laser parameters
+    frame = rospy.get_param('frame_id', 'laser')
+    # Range limits default based on retro-reflective target.
+    min_range = rospy.get_param('min_range', 0.1)
+    max_range = rospy.get_param('max_range', 150)
+    
+    # Initializaing serial connection
+    rospy.loginfo('Initializing serial port: %s, rate: %d, %s:%s:%s, timeout: %d', p, br, bs, prty, sb, to)
+    s = serial.Serial(port=p, baudrate=br, bytesize=bs, parity= prty, stopbits=sb, timeout=to)
+    
+    # Caching common message fields
+    msg = Range()
+    msg.header.frame_id = frame
+    msg.radiation_type = Range.INFRARED
+    msg.min_range = min_range
+    msg.max_range = max_range
+    
     rospy.init_node('acuity_serial')
 
     while not rospy.is_shutdown():
         try:
-            # Waiting for bytes to be in the queue, if not readlines returns anyway
-            # without updating the value.
-            # TODO: May want to throttle this loop at some point, although I think the
-            # inWaiting call is pretty lightweight
-            while s.inWaiting() > 0:
-                now = rospy.Time.now() #capture the time now in case the next few lines take some time
-                value = s.readline()
-                #rospy.loginfo('Reading value from serial port: %s', value)
-                msg = LaserRange()
-                msg.header.stamp = now 
-                msg.range = float(value)
-                pub.publish(msg)
+            # The following sequence of reads (read followed by readline)
+            # results in minimal processor usage.  This means the update
+            # rate of the node is driven by the laser hardware.
+            value = s.read()
+            #capture the time now in case the next few lines take some time
+            now = rospy.Time.now() 
+            value += s.readline()
+            rospy.logdebug('Reading value from serial port: %s', value)
+            
+            msg.header.stamp = now 
+            msg.range = float(value)
+            pub.publish(msg)
             
                 
         except ValueError as e:
